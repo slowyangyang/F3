@@ -410,7 +410,6 @@ export default {
           this.zNodes = []
           //遍历组织
           let parentNode = {}
-          
           for(let i=0;i<result.length;i++){
             if(result[i].name == '泰恒元科技'){
               parentNode.id = result[i].id
@@ -423,53 +422,84 @@ export default {
               break
             }
           }
-          for(let i = 0; i < result.length; i++){
-            let obj = {}
-            // if(val.name !== '泰恒元科技' && val.type == "group"){
-                obj.id = result[i].id
-                obj.name = result[i].name
-                obj.pid = result[i].pId
-                obj.uuid = result[i].uuid
-                obj.isParent = true,
-                obj.nocheck = true
-                obj.children = []
-                for(let j = i; j < result.length; j++){
-                  let objc = {}
-                  if(result[i].pId == result[j].id){
-                    objc.id = result[j].id
-                    objc.name = result[j].name
-                    objc.pid = result[j].pId
-                    objc.uuid = result[j].uuid
-                    objc.isParent = true,
-                    objc.nocheck = true
-                    objc.children = []
-                    obj.children.push(objc)
-                  }
-                }
-              // break;
-              this.zNodes[0].children.push(obj)
-            // }
-          }
-          console.log(this.zNodes);
-          // console.log(this.zNodes);
-          //遍历同级节点
-          // if(bv){
-          //   bv.forEach(val=>{
-          //     let obj = {}
-          //     obj.id = val.ve.id
-          //     obj.name = val.ve.plateNo
-          //     obj.simNo = val.ve.simNo
-          //     obj.orgId = val.ve.orgId
-          //     this.zNodes.push(obj)
-          //   })
+          this.eachOrg(result)
+          // for(let i = 0; i < result.length; i++){
+          //   let obj = {}
+          //   if(result[i].name !== '泰恒元科技' && result[i].type == "group"){
+          //     obj.id = result[i].id
+          //     obj.name = result[i].name
+          //     obj.pid = result[i].pId
+          //     obj.uuid = result[i].uuid
+          //     obj.isParent = true,
+          //     obj.nocheck = true
+          //     obj.children = []
+          //     for(let j = 0; j < result.length; j++){
+          //       let objc = {}
+          //       if(result[i].id == result[j].pId){
+                  
+          //         objc.id = result[j].id
+          //         objc.name = result[j].name
+          //         objc.pid = result[j].pId
+          //         objc.uuid = result[j].uuid
+          //         objc.isParent = true
+          //         objc.nocheck = true
+          //         objc.children = []
+          //         obj.children.push(objc)
+          //       }
+          //     }
+          //     if(result[i].uuid){
+          //       this.zNodes[0].children.push(obj)
+          //     }
+          //   }
           // }
           this.initzTree()
         }else{
           this.$notify({type:'primary',message:data.message})
         }
-      }).catch(err => {
-        console.log(new Error(err));
       })
+    },
+    eachOrg(org){
+      let group = []
+      let group1 = []
+      for(let i = 0; i < org.length; i++){
+        if(org[i].name !== '泰恒元科技' && org[i].type == "group"){
+          group.push(org[i])
+        }
+      }
+      for(let i = 0; i < org.length; i++){
+        if(org[i].name !== '泰恒元科技' && org[i].type == "assignment"){
+          group1.push(org[i])
+        }
+      }
+      console.log(group);
+      console.log(group1);
+      this.getTree(group)
+    },
+    getTree(group){
+      for(let i = 0; i < group.length; i++){
+        let obj1 = {}
+        obj1.id = group[i].id
+        obj1.name = group[i].name
+        obj1.pid = group[i].pId
+        obj1.uuid = group[i].uuid
+        obj1.isParent = true,
+        obj1.nocheck = true
+        obj1.children = []
+        for(let j = 0; j < group.length; j++){
+          let obj2 = {}
+          obj2.id = group[j].id
+          obj2.name = group[j].name
+          obj2.pid = group[j].pId
+          obj2.uuid = group[j].uuid
+          obj2.isParent = true
+          obj2.nocheck = true
+          obj2.children = []
+          if(group[i].id == group[j].pId){
+            obj1.children.push(obj2)
+          }
+        }
+        this.zNodes[0].children.push(obj1)
+      }
     },
     polling(){
       if(this.timer){
