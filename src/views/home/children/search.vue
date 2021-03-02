@@ -473,32 +473,55 @@ export default {
       }
       console.log(group);
       console.log(group1);
-      this.getTree(group)
+      this.getTree(group,group1)
     },
-    getTree(group){
+    getTree(group,group1){
       for(let i = 0; i < group.length; i++){
+        if(group[i].name == '网约车'){
+          console.log(group[i]);
+        }
         let obj1 = {}
         obj1.id = group[i].id
-        obj1.name = group[i].name
-        obj1.pid = group[i].pId
-        obj1.uuid = group[i].uuid
-        obj1.isParent = true,
-        obj1.nocheck = true
-        obj1.children = []
-        for(let j = 0; j < group.length; j++){
-          let obj2 = {}
-          obj2.id = group[j].id
-          obj2.name = group[j].name
-          obj2.pid = group[j].pId
-          obj2.uuid = group[j].uuid
-          obj2.isParent = true
-          obj2.nocheck = true
-          obj2.children = []
+              obj1.name = group[i].name
+              obj1.pid = group[i].pId
+              obj1.uuid = group[i].uuid
+              obj1.type = group[i].type
+              obj1.isParent = true
+              obj1.nocheck = true
+              obj1.children = []
+        for(let j = 1; j < group.length; j++){
+          
           if(group[i].id == group[j].pId){
-            obj1.children.push(obj2)
+              
+              let obj2 = {}
+              obj2.id = group[j].id
+              obj2.name = group[j].name
+              obj2.pid = group[j].pId
+              obj2.uuid = group[j].uuid
+              obj2.type = group[j].type
+              obj2.isParent = true
+              obj2.nocheck = true
+              obj2.children = []
+              obj1.children.push(obj2)
           }
         }
-        this.zNodes[0].children.push(obj1)
+        // for(let k = 0; k < group1.length; k++){
+        //   let obj3 = {}
+        //   if(group[i].id == group1[k].pId){
+        //     obj3.id = group1[k].id
+        //     obj3.name = group1[k].name
+        //     obj3.pid = group1[k].pId
+        //     obj3.uuid = group1[k].uuid
+        //     obj3.type = group1[k].type
+        //     obj3.isParent = true
+        //     obj3.nocheck = true
+        //     obj3.children = []
+        //     obj1.children.push(obj3)
+        //   }
+        // }
+        if(obj1.children.length !== 0){
+          this.zNodes[0].children.push(obj1)
+        }
       }
     },
     polling(){
