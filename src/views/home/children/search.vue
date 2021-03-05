@@ -32,14 +32,17 @@ import '@/assets/css/zTreeStyle.css'
 import "@/assets/js/jquery.ztree.core.min.js"
 import "@/assets/js/jquery.ztree.excheck.min.js"
 import "@/assets/js/jquery.ztree.exhide.min.js"
-import { getPNodes, queryLocal, searchPalteNo } from 'network/home'
+import { getPNodes, queryLocal, searchPalteNo, getTrees, getOrgTree, getVehicle } from 'network/home'
 import toTreeByRecursion from './tree'
 import pako from 'pako'
 import axios from 'axios'
+import qs from 'qs'
+
 export default {
   name:'search',
   data(){
     return {
+      vehicles:[],
       value:'',
       cordShow:false,
       isfetch:true,
@@ -161,9 +164,10 @@ export default {
   },
   mounted(){
     // this.initzTree()
+    this.getTred()
+    
   },
   activated(){
-    console.log(this.bvId);
     if(this.bvId.length){
       this.polling()
     }
@@ -172,31 +176,36 @@ export default {
     clearInterval(this.timer)
     this.timer = null
   },
-  computed: {
-    
-  },
   methods: {
+    getTred(){
+      getTrees({type:'single'}).then(res => {
+        console.log(res);
+      })
+    },
     onSearch(e){
       this.$emit('Search',e)
     },
     onCancel(e){
       this.$emit('Cancel',e)
     },
+    //搜索框得到焦点时
     onFocus(){
       if(this.isfetch){
         this.isfetch = false
         this.cordShow = true
+        //
         this.fetch()
-        // this.initzTree()
       }
     },
     onBlur(){
       return false
     },
+    //关闭按钮
     btnCancel(){
       this.cordShow = false
       this.isfetch = true
     },
+    //确定按钮
     btnConfirm(){
       let str = ''
       this.bvId = []
@@ -228,57 +237,54 @@ export default {
         }
       })
     },
+    //被折叠
     Collapse(event, treeId, treeNode){
-      //被折叠
       console.log(treeNode);
     },
     //展开时请求子节点
     Expand(event, treeId, treeNode){
-      console.log(treeNode);
-      if(!treeNode.isParent){
-        return
+      if(treeNode.children){
+        return false
       }
       // this.getZNodes(treeNode)
     },
     getZNodes(treeNode){
-      getZNodes(treeNode.id).then(res => {
+      getVehicle({assignmentId:treeNode.id}).then(res => {
         let data = res.data
-        let result = this.unzip(res.data.result)
+        let result = this.unzip(res.data.msg)
         console.log(result);
         let nodes = []
-        if(data.status == 0){
-          let org = result.data.org
-          let bv = result.data.bv
-          if(org){
-            org.forEach(val => {
-              let obj = {}
-              obj.id = val.id
-              obj.name = val.orgName
-              obj.pid = val.parentId
-              obj.isParent = true
-              obj.nocheck = true
-              nodes.push(obj)
-            })
-            this.treeObj.addNodes(treeNode,-1,nodes,true)
-          }
-          if(bv){
-            nodes = []
-            bv.forEach(val=>{
-              let obj = {}
-              obj.id = val.ve.id
-              obj.name = val.ve.plateNo
-              obj.simNo = val.ve.simNo
-              obj.orgId = val.ve.orgId
-              nodes.push(obj)
-            })
-            console.log(nodes);
-            this.treeObj.addNodes(treeNode,-1,nodes,true)
-          }
-          this.treeObj.updateNode(treeNode,false)
-          console.log(this.zNodes);
-        }else{
-          this.$notify("暂无此数据")
-        }
+        // if(data.status == 0){
+        //   let org = result.data.org
+        //   let bv = result.data.bv
+        //   if(org){
+        //     org.forEach(val => {
+        //       let obj = {}
+        //       obj.id = val.id
+        //       obj.name = val.orgName
+        //       obj.pid = val.parentId
+        //       obj.isParent = true
+        //       obj.nocheck = true
+        //       nodes.push(obj)
+        //     })
+        //     this.treeObj.addNodes(treeNode,-1,nodes,true)
+        //   }
+        //   if(bv){
+        //     nodes = []
+        //     bv.forEach(val=>{
+        //       let obj = {}
+        //       obj.id = val.ve.id
+        //       obj.name = val.ve.plateNo
+        //       obj.simNo = val.ve.simNo
+        //       obj.orgId = val.ve.orgId
+        //       nodes.push(obj)
+        //     })
+        //     console.log(nodes);
+        //     this.treeObj.addNodes(treeNode,-1,nodes,true)
+        //   }
+          // this.treeObj.updateNode(treeNode,false)
+          // console.log(this.zNodes);
+        // }
       })
     },
     initzTree(){
@@ -295,8 +301,12 @@ export default {
         if(treeNode.open){
           this.treeObj.expandNode(treeNode,false)
         }else{
-          this.getZNodes(treeNode)
+          if(treeNode.children){
+            this.treeObj.expandNode(treeNode,true)
+            return false
+          }
           this.treeObj.expandNode(treeNode,true)
+          this.getZNodes(treeNode)
         }
         return
       }
@@ -331,86 +341,14 @@ export default {
       }
       return this.nodes
     },
-    searchFun (val, isHighLight, isExpand) {
-	      var key = val.replace(/(^\s*)|(\s*$)/g, "")
-	      this.nodesShow = []
-	      isHighLight = isHighLight === false ? false : true
-	      isExpand = isExpand ? true : false
-	      this.filterzTree(key, this.allNodes, isExpand, isHighLight)
-	      if (this.keyValue === '') {
-	        this.noData = false
-	      }else {
-	        if (this.nodesShow.length === 0) {
-	          this.noData = true
-	        }else {
-	          this.noData = false
-	        }
-	      }
-	      this.showNodesFun(this.nodesShow, key)
-    },
-    filterzTree(key, nodes, isExpand, isHighLight){
-      var metaChar = '[\\[\\]\\\\\^\\$\\.\\|\\?\\*\\+\\(\\)]'
-      var rexMeta = new RegExp(metaChar, 'gi')
-      var nameKey = this.treeObj.setting.data.key.name
-      for (var i =0; i < nodes.length; i++) {
-        // if (nodes[i] && nodes[i].oldname && nodes[i].oldname.length > 0) {
-        //   nodes[i][nameKey] = nodes[i].oldname
-        // }
-        // this.treeObj.updateNode(nodes[i])
-        if (key === '') {
-          this.initzTree()
-          break
-        }else {
-          if(nodes[i][nameKey] && nodes[i][nameKey].toLowerCase().indexOf(key.toLowerCase()) !== -1) {
-            if (isHighLight) {
-              var newKeywords = key.replace(rexMeta, (matchStr) => {
-                return '//' + matchStr
-              })
-              nodes[i].oldname = nodes[i][nameKey]
-              var rexGlobal = new RegExp(newKeywords, 'gi')
-              nodes[i][nameKey] = nodes[i].oldname.replace(rexGlobal, (originalText) => {
-                var highLightText =
-                '<span style="color: whitesmoke;background-color: darkred;">'
-                + originalText
-                +'</span>'
-                return 	highLightText
-              })
-              this.treeObj.updateNode(nodes[i])
-            }
-            console.log(nodes[i]);
-            this.treeObj.showNode(nodes[i])
-            this.nodesShow.push(nodes[i])
-          }else {
-            this.treeObj.hideNode(nodes[i])
-          }
-        }
-      }
-    },
-    showNodesFun (nodesShow, key) {
-      if(key.length > 0){
-        nodesShow.forEach(node => {
-          var pathOfOne = node.getPath()
-          if (pathOfOne && pathOfOne.length > 0) {
-            for (var i = 0; i < pathOfOne.length - 1; i++) {
-              console.log(pathOfOne[i]);
-                this.treeObj.showNode(pathOfOne[i])
-              this.treeObj.expandNode(pathOfOne[i], true)
-            }
-          }
-        })
-      }else {
-        var rootNodes = this.treeObj.getNodesByParam('level', '0')
-        rootNodes.forEach(node => {
-          this.treeObj.expandNode(node, true)
-        })
-      }
-    },
+    //无限级菜单遍历
     getTreeData(list){
         var treeData=[];
         var map={};
         list.forEach(function (item) {
           item.nocheck = true
             item['name']=item.name;
+            item["isParent"] = true
             map[item.id]=item;
         })
         list.forEach(function (item) {
@@ -423,20 +361,25 @@ export default {
         })
         return treeData;
     },
+    //
     fetch(){
-      getPNodes().then(res => {
+      getOrgTree({isOrg:1}).then(res => {
+        console.log(res);
         let data = res.data
-        let result = this.unzip(data) 
-        if(result){
-          this.zNodes = []
-          this.zNodes = this.getTreeData(result)
-          //遍历组织
-          this.initzTree()
+        if(data.success){
+          if(data.obj){
+            this.zNodes = []
+            let treenode = []
+            this.zNodes = this.getTreeData(data.obj)
+            //初始化树组织
+            this.initzTree()
+          }
         }else{
           this.$notify({type:'primary',message:data.message})
         }
       })
     },
+    //对车辆位置做轮询
     polling(){
       if(this.timer){
         clearInterval(this.timer)

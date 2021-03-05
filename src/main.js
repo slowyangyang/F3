@@ -16,6 +16,7 @@ Vue.prototype.$Bus = new Vue()
 Vue.use(Vant);
 Vue.use(Toast);
 Vue.prototype.$Toast = Toast
+Toast.setDefaultOptions({ duration: 2000 });
 // Vue.prototype.$post = request.post
 // Vue.prototype.$get = request.get
 // Vue.prototype.$put = request.put

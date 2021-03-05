@@ -2,8 +2,9 @@
   <div class="profile">
     <!-- 导航栏 -->
     <nav-bar :title="title"/>
+    <!-- 展示用户信息 -->
     <user-info :infoList="infoList"/>
-    <!-- 推送列表  -->
+    <!-- 报警推送列表  -->
     <my-push-list/>
     <!-- 退出登录 -->
     <van-button type="danger" round  @click="show = true">用户解绑</van-button>
@@ -46,6 +47,9 @@ export default {
     UserInfo,
     MyPushList
   },
+  mounted(){
+    this.infoList = db.get("USER_INFO")
+  },
   methods: {
     exit(e){
       let openid = db.get("OPENID")
@@ -65,9 +69,7 @@ export default {
       })
     },
   },
-  mounted(){
-    this.infoList = db.get("USER")
-  }
+  
 }
 </script>
 

@@ -15,4 +15,6 @@ export function isLogin(code){
 export function exitLogin(code){
   return request.post("/app/login/loginByCode",code)
 }
-
+export function getToken(data){
+  return request.post("/oauth/token",data)
+}

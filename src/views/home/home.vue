@@ -6,7 +6,7 @@
     <!-- 搜索 -->
     <Search @Search="Search" @Cancel="Cancel"/>
     
-    <!-- 地图 -->
+    <!-- 地图组件 -->
     <map-content class="map_box"/>
       
     <van-loading color="#1989fa" v-if="showLoading"/>
@@ -48,8 +48,8 @@ export default {
     Search(e){
       console.log(e);
     },
+    //清除搜索内容
     Cancel(){
-      //清除搜索内容
     },
    //获取JSSDK鉴权
     getJsSdk(){

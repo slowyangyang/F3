@@ -39,6 +39,7 @@
 
 <script>
 import slider from './slider'
+import db from '@/common/localstorage'
 export default {
   name:'selelct',
   components: {
@@ -48,10 +49,15 @@ export default {
     return {
       radio: '1',
       label:'用户名',
-      username: '',
+      username: "",
       password: '',
       placeholder:'用户名',
     }
+  },
+  created(){
+    let userInfo = db.get("USER_INFO")
+    this.username = userInfo.username
+    this.password = userInfo.password
   },
   methods: {
     radioChange(e){

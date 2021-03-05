@@ -55,9 +55,8 @@ router.beforeEach((to, from, next)=>{
   }
   if(to.path != '/login'){
     if(to.meta.isAuthenticated){
-      // let token = db.get('token')
-      let token = '13216132132'
-      if(token) {
+      let expireTime = db.get("expireTime")
+      if(expireTime) {
         next()
       }else{
         next('/login')
