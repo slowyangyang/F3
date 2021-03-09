@@ -11,7 +11,7 @@ Toast.setDefaultOptions({
 let FEBS_REQUEST = axios.create({
   // baseURL: process.env.VUE_APP_BASEURL,
   // baseURL: `http://gzh.thygps.com`,
-  baseURL: `https://zs.thygps.com/clbs`,
+  baseURL: `/api`,
   responseType: 'json',
   withCredentials: true, // 允许携带cookie
   crossDomain: true,

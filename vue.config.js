@@ -19,10 +19,10 @@ module.exports = {
       port:8083,
       proxy: {//本地跨域配置
         '/api':{
-          target:'https://zs.thygps.com',
-          changeOrigin: true,
+          target:'https://zs.thygps.com/clbs',
+          // changeOrigin: true,
           pathRewrite:{
-            '^/api':'/api'
+            '^/api':''
           }
         }
       }
