@@ -39,14 +39,15 @@ export default {
         speed:'38',
         time:'2020-12-14 14:11:22'
       }],
-      baseUrl: process.env.BASE_URL
-
+      baseUrl: process.env.BASE_URL,
+      local:''
     }
   },
   created(){
   },
   activated(){
     this.$Bus.$on("getlocal",position => {
+      console.log(position);
       // this.markers = []
       this.markers = position
       console.log(this.markers);
@@ -85,6 +86,8 @@ export default {
       });
       //遍历标记数组
       this.markers.forEach((val,index) => {
+        console.log(this.regeoCode(val));
+        console.log(val);
         let mark = new AMap.Marker({
           icon: startIcon,
           position: [val.longitude,val.latitude],
@@ -92,15 +95,15 @@ export default {
           label:{
                   offset: new AMap.Pixel(0, 10),  //设置文本标注偏移量
                   icon:startIcon,
-                  content: `<div class='info'>${val.plateNo}</div>`, //设置文本标注内容
+                  content: `<div class='info'>${val.monitorName}</div>`, //设置文本标注内容
                   direction: 'right' //设置文本标注方位
           },
           extData:{
-            plate:val.plateNo,
-            local:val.location,
-            speed:val.velocity,
-            time:val.sendTime,
-            weight:val.weightF8 ? val.weightF8/1000 : 0
+            plate:val.monitorName,
+            location:this.regeoCode(val),
+            speed:val.speed,
+            time:val.time,
+            weight:val.loadWeight ? val.loadWeight/1000 : 0
           }
         });
         //添加窗体
@@ -118,19 +121,19 @@ export default {
     createInfoWindow(e) {
       let _this = this
       let data = e.target.getExtData()
+      console.log(data);
       // data.plate = '渝D44497'
       // let encodeStr = encodeURI(data.plate)
       let content = `<p class='w_title' style='text-align: center;font-size: 14px;font-weight:bold;margin-bottom:0.05rem'>${data.plate}</p>
                       <div class='w_content' style='margin-bottom:0.05rem'>
                         <p style='margin-bottom:0.05rem'>速度：${data.speed} (km/h)</p>
                         <p style='margin-bottom:0.05rem'>时间：${data.time}</p>
-                        <p>重量：${data.weight}吨</p>
                       </div>
-                      <div>地点：${data.local}</div>
+                      <div>地点：${_this.local}</div>
                       <div class='w_tools' style='display:flex;justify-content:center;color:#4696e6'>
                       <div style='margin-right:0.1rem' onclick="playBack()">轨迹回放</div>
                       <div style=''">
-                      <a style="color:#4696e6" href=https://zs.thygps.com/clbs/v/monitoring/forward?key=EFAD60B7A0EC7016EE4AFC9B3CE5D52E&VehPlateNum=${data.plate}&VehPlateColorCode=2&Channel=1,2">实时视频</a>
+                      <a style="color:#4696e6" href=https://zs.thygps.com/clbs/v/monitoring/forward?key=EFAD60B7A0EC7016EE4AFC9B3CE5D52E&VehPlateNum=${data.plate}&VehPlateColorCode=2&Channel=1,2" target="_blank">实时视频</a>
                       </div></div>`
       let infowindow = new AMap.InfoWindow({
         autoMove:true,
@@ -154,20 +157,48 @@ export default {
       }
       
     },
+    solveWeightStatus(val){
+      switch(val.loadStatus){
+        case 1: 0
+          val.loadStatus = '异常'
+          break;
+        case 2: 1
+          val.loadStatus = '空载'
+          break;
+        case 3: 2
+          val.loadStatus = '满载'
+          break;
+        case 4: 3
+          val.loadStatus = '超载'
+          break;
+        case 5: 4
+          val.loadStatus = '装载'
+          break;
+        case 6: 5
+          val.loadStatus = '卸载'
+          break;
+        case 7: 6
+          val.loadStatus = '轻载'
+          break; 
+        case 8: 7
+          val.loadStatus = '重载'
+          break;              
+      }
+    },
     //逆地址解析
-    regeoCode(lnglat){
+    regeoCode(val){
+      let _this = this
       var geocoder = new AMap.Geocoder({
         city: "010", //城市设为北京，默认：“全国”
         radius: 1000 //范围，默认：500
       });
-      geocoder.getAddress(lnglat, (status, result) =>{
+      geocoder.getAddress([val.longitude,val.latitude], (status, result) =>{
         if (status === 'complete'&& result.regeocode) {
-            var address = result.regeocode.formattedAddress;
-            document.getElementById('address').value = address;
+            _this.local = result.regeocode.formattedAddress;
         }else{
             log.error('根据经纬度查询地址失败')
         }
-      });
+      })
     }
   }
 }

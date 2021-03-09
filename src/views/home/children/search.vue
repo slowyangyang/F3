@@ -4,11 +4,12 @@
       <van-search
         v-model="value"
         shape="round"
-        placeholder="请输入车牌号"
+        placeholder="请输入车牌号3个字符以上"
         @search="onSearch"
         @cancel="onCancel"
         @focus="onFocus"
         @blur="onBlur"
+        @clear="onClear"
         ref="search"/>
     </form>
     <!-- 搜索记录 -->
@@ -159,7 +160,8 @@ export default {
       ],
       bvId:[],
       timer:null,
-      autoParam:[]
+      autoParam:[],
+      yiu:""
     }
   },
   mounted(){
@@ -168,24 +170,29 @@ export default {
     
   },
   activated(){
-    if(this.bvId.length){
+    //判断this.bvId,是否继续进行轮询
+    let arrBV = Object.keys(this.bvId)
+    if(arrBV.length){
       this.polling()
     }
   },
   deactivated(){
+    console.log(255);
     clearInterval(this.timer)
     this.timer = null
   },
   methods: {
+    //获取车辆树
     getTred(){
       getTrees({type:'single'}).then(res => {
-        console.log(res);
+        this.vehicles = res.data.obj
       })
     },
     onSearch(e){
       this.$emit('Search',e)
     },
     onCancel(e){
+      console.log(22);
       this.$emit('Cancel',e)
     },
     //搜索框得到焦点时
@@ -197,6 +204,9 @@ export default {
         this.fetch()
       }
     },
+    onClear(e){
+      this.$emit("clear",e)
+    },
     onBlur(){
       return false
     },
@@ -204,11 +214,12 @@ export default {
     btnCancel(){
       this.cordShow = false
       this.isfetch = true
+      this.value = ""
     },
     //确定按钮
     btnConfirm(){
       let str = ''
-      this.bvId = []
+      this.bvId = {}
       //获取选中的项
       let checked = this.treeObj.getChangeCheckedNodes(true)
       //筛选叶子节点
@@ -216,11 +227,12 @@ export default {
       if(checked.length){
         checked.forEach(val => {
           str+=val.name+','
-          this.bvId.push(val.id)
+          // this.bvId.push(val.name)
         })
         str = str.substr(0,str.length-1)
+        this.bvId = {name:str}
         this.value = str
-        this.queryCar(this.bvId)
+        this.queryCar({name:str})
       }
       this.cordShow = false
       this.isfetch = true
@@ -229,13 +241,125 @@ export default {
       queryLocal(bvId).then(res => {
         console.log(res);
         let data = res.data
-        if(data.status === '0'){
-          this.$Bus.$emit('getlocal',data.result.vehicle)
+        if(data.data.length){
+          let isEmpty = data.data.filter(ele => (ele.longitude=="" || ele.latitude==""))
+          if(isEmpty.length){
+            this.$notify({ type: 'primary', message: "未查询到该车位置"});
+            return false
+          }
+          let positionData = this.calcPosition(data.data)
+          console.log(positionData);
+          this.$Bus.$emit('getlocal',positionData)
           this.polling()
         }else{
-          this.$notify({ type: 'primary', message: data.msg});
+          this.$notify({ type: 'primary', message: "未查询到位置信息"});
         }
       })
+    },
+    //计算经纬度
+    calcPosition(data){
+      data.map(ele => {
+        ele.longitude = ele.longitude/1000000
+        ele.latitude = ele.latitude/1000000
+        ele.time = this.cutTime(ele.time)
+      })
+      return data
+    },
+    //时间拼接
+    cutTime(time){
+      let date = new Date()
+      let year = ""+date.getFullYear()
+      year = year.substr(0,2)
+      let times =''
+      let fullyear = year+time.substr(0,2)
+      let month = time.substr(2,2)
+      let day = time.substr(4,2)
+      let hour = time.substr(6,2)
+      let minu = time.substr(8,2)
+      let second = time.substr(10,2)
+      return fullyear + '-' + month + '-' + day + ' ' + hour + ':' + minu +':' + second
+    },
+    queryFun(node) {
+      for (var i in node) {
+        this.nodes.push(node[i])
+        if (node[i].children) {
+          this.queryFun(node[i].children)
+        }
+      }
+      return this.nodes
+    },
+    searchFun (val, isHighLight, isExpand) {
+	      var key = val.replace(/(^\s*)|(\s*$)/g, "")
+	      this.nodesShow = []
+	      isHighLight = isHighLight === false ? false : true
+	      isExpand = isExpand ? true : false
+	      this.filterzTree(key, this.allNodes, isExpand, isHighLight)
+	      if (this.keyValue === '') {
+	        this.noData = false
+	      }else {
+	        if (this.nodesShow.length === 0) {
+	          this.noData = true
+	        }else {
+	          this.noData = false
+	        }
+	      }
+	      this.showNodesFun(this.nodesShow, key)
+    },
+    filterzTree(key, nodes, isExpand, isHighLight){
+      var metaChar = '[\\[\\]\\\\\^\\$\\.\\|\\?\\*\\+\\(\\)]'
+      var rexMeta = new RegExp(metaChar, 'gi')
+      var nameKey = this.treeObj.setting.data.key.name
+      for (var i =0; i < nodes.length; i++) {
+        // if (nodes[i] && nodes[i].oldname && nodes[i].oldname.length > 0) {
+        //   nodes[i][nameKey] = nodes[i].oldname
+        // }
+        // this.treeObj.updateNode(nodes[i])
+        if (key === '') {
+          this.initzTree()
+          break
+        }else {
+          if(nodes[i][nameKey] && nodes[i][nameKey].toLowerCase().indexOf(key.toLowerCase()) !== -1) {
+            if (isHighLight) {
+              var newKeywords = key.replace(rexMeta, (matchStr) => {
+                return '//' + matchStr
+              })
+              nodes[i].oldname = nodes[i][nameKey]
+              var rexGlobal = new RegExp(newKeywords, 'gi')
+              nodes[i][nameKey] = nodes[i].oldname.replace(rexGlobal, (originalText) => {
+                var highLightText =
+                '<span style="color: whitesmoke;background-color: darkred;">'
+                + originalText
+                +'</span>'
+                return 	highLightText
+              })
+              this.treeObj.updateNode(nodes[i])
+            }
+            this.treeObj.showNode(nodes[i])
+            this.nodesShow.push(nodes[i])
+          }else {
+            this.treeObj.hideNode(nodes[i])
+          }
+        }
+      }
+    },
+    showNodesFun (nodesShow, key) {
+      if(key.length > 0){
+        nodesShow.forEach(node => {
+          var pathOfOne = node.getPath()
+          if (pathOfOne && pathOfOne.length > 0) {
+            for (var i = 0; i < pathOfOne.length - 1; i++) {
+              // console.log(pathOfOne[i]);
+                this.treeObj.showNode(pathOfOne[i])
+                this.treeObj.expandNode(pathOfOne[i], true)
+            }
+          }
+        })
+      }else {
+        var rootNodes = this.treeObj.getNodesByParam('level', '0')
+        rootNodes.forEach(node => {
+          this.treeObj.expandNode(node, true)
+        })
+      }
     },
     //被折叠
     Collapse(event, treeId, treeNode){
@@ -244,56 +368,27 @@ export default {
     //展开时请求子节点
     Expand(event, treeId, treeNode){
       if(treeNode.children){
+        console.log(1);
         return false
       }
-      // this.getZNodes(treeNode)
+      this.getZNodes(treeNode)
     },
     getZNodes(treeNode){
-      getVehicle({assignmentId:treeNode.id}).then(res => {
-        let data = res.data
-        let result = this.unzip(res.data.msg)
-        console.log(result);
-        let nodes = []
-        // if(data.status == 0){
-        //   let org = result.data.org
-        //   let bv = result.data.bv
-        //   if(org){
-        //     org.forEach(val => {
-        //       let obj = {}
-        //       obj.id = val.id
-        //       obj.name = val.orgName
-        //       obj.pid = val.parentId
-        //       obj.isParent = true
-        //       obj.nocheck = true
-        //       nodes.push(obj)
-        //     })
-        //     this.treeObj.addNodes(treeNode,-1,nodes,true)
-        //   }
-        //   if(bv){
-        //     nodes = []
-        //     bv.forEach(val=>{
-        //       let obj = {}
-        //       obj.id = val.ve.id
-        //       obj.name = val.ve.plateNo
-        //       obj.simNo = val.ve.simNo
-        //       obj.orgId = val.ve.orgId
-        //       nodes.push(obj)
-        //     })
-        //     console.log(nodes);
-        //     this.treeObj.addNodes(treeNode,-1,nodes,true)
-        //   }
-          // this.treeObj.updateNode(treeNode,false)
-          // console.log(this.zNodes);
-        // }
+       this.vehicles.forEach(ele => {
+        if(ele.pId == treeNode.id){
+          this.treeObj.addNodes(treeNode,-1,ele,true)
+        }
       })
     },
     initzTree(){
-      $.fn.zTree.init($("#"+this.treeId), this.setting, this.zNodes).expandAll(false);
+      $.fn.zTree.init($("#"+this.treeId), this.setting, this.zNodes).expandAll(false)
       this.treeObj = $.fn.zTree.getZTreeObj("ztree")
       var nodes = this.treeObj.getNodes()
+      console.log(nodes);
       this.allNodes = this.queryFun(nodes)
       this.nodes = []
     },
+    //点击节点时
     zTreeOnClick(event, treeId, treeNode){
       let checked = this.treeObj.getCheckedNodes(true)
       console.log(treeNode);
@@ -332,36 +427,27 @@ export default {
         }
       }
     },
-    queryFun(node) {
-      for (var i in node) {
-        this.nodes.push(node[i])
-        if (node[i].children) {
-          this.queryFun(node[i].children)
-        }
-      }
-      return this.nodes
-    },
     //无限级菜单遍历
     getTreeData(list){
         var treeData=[];
         var map={};
         list.forEach(function (item) {
           item.nocheck = true
-            item['name']=item.name;
-            item["isParent"] = true
-            map[item.id]=item;
+          item['name']=item.name;
+          item["isParent"] = true
+          map[item.id]=item;
         })
         list.forEach(function (item) {
-            var parent = map[item.pId];
-            if (parent) {
-                (parent.children || ( parent.children = [] )).push(item);
-            } else {
-                treeData.push(item);
-            }
+          var parent = map[item.pId];
+          if (parent) {
+              (parent.children || ( parent.children = [] )).push(item);
+          } else {
+              treeData.push(item);
+          }
         })
         return treeData;
     },
-    //
+    //获取组织树
     fetch(){
       getOrgTree({isOrg:1}).then(res => {
         console.log(res);
@@ -379,7 +465,7 @@ export default {
         }
       })
     },
-    //对车辆位置做轮询
+    //对车辆位置做轮询查找
     polling(){
       if(this.timer){
         clearInterval(this.timer)
@@ -388,10 +474,12 @@ export default {
         queryLocal(this.bvId).then(res => {
           console.log(res);
           let data = res.data
-          if(data.status == 0){
-            this.$Bus.$emit('getlocal',data.result.vehicle)
+          if(data.data.length){
+            let positionData = this.calcPosition(data.data)
+            this.$Bus.$emit('getlocal',positionData)
           }else{
-            this.$notify({ type: 'primary', message: data.msg});
+            clearInterval(this.timer)
+            this.$notify({ type: 'primary', message: "未查询到位置信息"});
           }
         })
       },30000)
@@ -446,33 +534,47 @@ export default {
   },
   watch: {
     value(newV) {
-      //本地搜索
-      // this.searchFun(newV, false, false)
+      this.zNodes = []
+      if(!newV){
+        this.fetch()
+      }
+      let reg = new RegExp(newV)
       if(newV.length>=3 && newV){
-        searchPalteNo(newV).then(res=>{
-          console.log(res);
-          let data = res.data
-          let result = this.unzip(res.data.result)
-          if(data.status === '0'){
-            let bv = result.data.bv
-            // let bv = res.data.result.data.bv
-            if(bv){
-              this.zNodes = []
-              bv.forEach(val=>{
-                let obj = {}
-                obj.id = val.ve.id
-                obj.name = val.ve.plateNo
-                obj.simNo = val.ve.simNo
-                obj.orgId = val.ve.orgId
-                this.zNodes.push(obj)
-              })
-              this.initzTree()
-            }
-          }else{
-            this.$notify("无此车辆信息")
+        this.vehicles.forEach(ele => {
+          if(reg.test(ele.name)){
+            this.zNodes.push(ele)
           }
         })
+        this.initzTree()
       }
+      //本地搜索
+      // this.searchFun(newV, false, false)
+      //请求搜索
+      // if(newV.length>=3 && newV){
+      //   searchPalteNo(newV).then(res=>{
+      //     console.log(res);
+      //     let data = res.data
+      //     let result = this.unzip(res.data.result)
+      //     if(data.status === '0'){
+      //       let bv = result.data.bv
+      //       // let bv = res.data.result.data.bv
+      //       if(bv){
+      //         this.zNodes = []
+      //         bv.forEach(val=>{
+      //           let obj = {}
+      //           obj.id = val.ve.id
+      //           obj.name = val.ve.plateNo
+      //           obj.simNo = val.ve.simNo
+      //           obj.orgId = val.ve.orgId
+      //           this.zNodes.push(obj)
+      //         })
+      //         this.initzTree()
+      //       }
+      //     }else{
+      //       this.$notify("无此车辆信息")
+      //     }
+      //   })
+      // }
     },
     cordShow(newVal){
       if(newVal){

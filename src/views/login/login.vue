@@ -1,7 +1,13 @@
 <template>
   <div class="login">
-    <nav-bar 
-      :title="title"/>
+    <div class="logo_box">
+      <van-image
+        round
+        width="1rem"
+        height="1rem"
+        :src="logo"/>
+      <!-- <p>登录</p> -->
+    </div>
     <select-type @login="handleSubmit"></select-type>
   </div>
 </template>
@@ -23,6 +29,7 @@ export default {
       code:'',
       local:'',
       openId:'',
+      logo:require("../../assets/image/logo.png")
     }
   },
   created(){
@@ -67,8 +74,6 @@ export default {
       }
       getToken(data).then(res=>{
         let data = res.data
-        console.log(res.status);
-        console.log(res.data);
         if(res.status == 200){
           db.save("expireTime",data.expiration)
           db.save("TOKEN",data.value)
@@ -76,11 +81,9 @@ export default {
           this.saveToken(data.value)
           //保存用户信息
           db.save("USER_INFO",value)
-          this.$Toast("登录成功",1500)
+          this.$Toast({message:"登录成功",duration:1500})
           this.$router.push({path:'/home'})
         }
-      }).catch(err=>{
-        console.log(err);
       })
     }
   },
@@ -88,11 +91,40 @@ export default {
 </script>
 
 <style scoped>
+.login{
+  height: 100%;
+  padding: 0.7rem 0.24rem 0 0.24rem;
+  background: url("../../assets/image/login-bg.png") no-repeat;
+  background-size: cover;
+}
+/deep/.van-field__left-icon{
+  color: #fff;
+}
+.logo_box{
+  position: relative;
+  display: inline-block;
+  left: 50%;
+  margin-bottom: 0.3rem;
+  transform: translateX(-50%);
+  text-align: center;
+  font-size: 22px;
+}
 /deep/.van-nav-bar__title{
+  color: #fff;
+}
+/deep/.van-cell{
+  padding: 16px 16px;
+  background-color: transparent;
+}
+/deep/.van-field__label{
   color: #fff;
 }
 /deep/.van-nav-bar__content{
   background: #1989fa;
+}
+/deep/.van-field__control{
+  padding-left: 0.2rem;
+  color: #fff;
 }
 /deep/.van-tabbar--fixed{
   display: none;
@@ -101,6 +133,12 @@ export default {
   display: none;
 }
 /deep/.van-button--normal{
-  height: 0.4rem;
+  font-size: 0.16rem;
+  height: 0.5rem;
+  background:transparent;
+  border: 0.01rem solid #fff;
+}
+/deep/.van-field__control::-webkit-input-placeholder{
+  color: #fff;
 }
 </style>

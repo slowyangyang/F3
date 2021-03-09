@@ -27,7 +27,7 @@ FEBS_REQUEST.interceptors.request.use((config) => {
   // 有 token就带上
   let token = store.state.TOKEN
   if(token){
-    config.url = config.url+"?access_token="+token
+    config.url = config.url+(config.method == 'post' ? "?access_token="+token : "access_token="+token)
   }
   let newTime = new Date()
   let expireTime = store.state.expire_time
@@ -40,7 +40,6 @@ FEBS_REQUEST.interceptors.request.use((config) => {
       },1000)
     }
   }
- 
   return config
 }, (error) => {
   return Promise.reject(error)
@@ -69,8 +68,9 @@ FEBS_REQUEST.interceptors.response.use((config) => {
   return config
 }, (error) => {
   if (error.response) {
+    console.log(error.response);
     let errorMessage = error.response.data === null ? '系统内部异常，请联系网站管理员' : error.response.data.message
-    Toast({message:errorMessage})
+    Toast({message:errorMessage,duration:1500})
   }
   Toast.clear()
   return Promise.reject(error)

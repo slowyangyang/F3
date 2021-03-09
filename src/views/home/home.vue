@@ -4,7 +4,7 @@
     <nav-bar :title="title"/>
     
     <!-- 搜索 -->
-    <Search @Search="Search" @Cancel="Cancel"/>
+    <Search @Search="Search" @Cancel="Cancel" @clear="clearHandel"/>
     
     <!-- 地图组件 -->
     <map-content class="map_box"/>
@@ -45,6 +45,9 @@ export default {
     }
   },
   methods: {
+    clearHandel(e){
+      console.log(e);
+    },
     Search(e){
       console.log(e);
     },

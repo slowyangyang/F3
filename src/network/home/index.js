@@ -18,12 +18,12 @@ export function searchPalteNo(search=""){
 }
 /** Search 车辆信息**/ 
 export function queryLocal(bvId){
-  return request.get("/app/vehicle/provideBVehicleInfo?bvId="+bvId.join(','))
+  return request.get("/swagger/m/monitoring/monitor/location/latest",bvId)
 }
 /** 轨迹 **/ 
 export function trackQuery(plateno,stime,etime){
-  return request.get("/app/track/getCarHistory",{
-    plateNo:plateno,
+  return request.get("/swagger/m/monitoring/monitor/location/history",{
+    name:plateno,
     startTime:stime,
     endTime:etime
   })
