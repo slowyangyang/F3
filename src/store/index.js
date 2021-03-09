@@ -6,8 +6,8 @@ Vue.use(Vuex)
 
 export default new Vuex.Store({
   state: {
-    token:db.get("token"),
-    user_info:db.get("USER")
+    TOKEN:db.get("TOKEN"),
+    expire_time: db.get("expireTime")
   },
   getters: {
     emitCookie(state){
@@ -15,11 +15,14 @@ export default new Vuex.Store({
     }
   },
   mutations: {
-    saveToken(state,payload){
-      state.token = payload.token
+    saveExpireTime(state,payload){
+      state.expire_time = payload.time
     },
     saveUser(state,payload){
       state.user_info = payload
+    },
+    saveToken(state,payload){
+      state.TOKEN = payload
     }
   },
   actions: {

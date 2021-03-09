@@ -63,28 +63,6 @@
             </van-popup>
           </div>
           </div>
-          <!-- <div>
-            <van-cell is-link @click="lowSpeed=true">低速(最高)：{{speed1}}</van-cell>
-            <van-popup v-model="lowSpeed" position="bottom" :style="{ height: '30%' }">
-              <van-picker
-                title="速度选择"
-                show-toolbar
-                :columns="columns1"
-                @confirm="lowConfirm"
-                @cancel="lowSpeed = false"/>
-            </van-popup>
-          </div>
-          <div>
-            <van-cell is-link @click="heightSpeed=true">中速(最高)：{{speed2}}</van-cell>
-            <van-popup v-model="heightSpeed" position="bottom" :style="{ height: '30%' }">
-              <van-picker
-                title="速度选择"
-                show-toolbar
-                :columns="columns2"
-                @confirm="heightConfirm"
-                @cancel="heightSpeed = false"/>
-            </van-popup>
-          </div> -->
           <div class="w_bottom">
             <div class="btn" @click="show = false">取消</div>
             <div class="btn" @click="btnConfirm">确认</div>
@@ -97,17 +75,14 @@
       <p>位置：{{trackInfo.location}}</p>
       <p><span>速度：</span>{{trackInfo.velocity}} km/h</p>
       <p><span>时间：</span>{{trackInfo.sendTime}}</p>
-      <p><span>重量：</span>{{trackInfo.weight}}吨</p>
+      <!-- <p><span>重量：</span>{{trackInfo.weight}}吨</p> -->
       <p><span>里程：</span>{{parseInt(trackInfo.distance)/1000}}km</p>
     </div>
     <!-- 载重 -->
-    <div class="carLoad" ref="carLoad">
+    <!-- <div class="carLoad" ref="carLoad">
       <p class="controlCharts" @click="trolHandel"><van-icon :name="loadShow ? 'arrow-down' : 'arrow-up'" /></p>
-      <!-- <div class="loadBox"> -->
         <div id="loadMain" class="loadMain" ref="loadMain" style="width: 100%;"></div>
-        <!-- <van-empty image="https://img.yzcdn.cn/vant/custom-empty-image.png" image-size="70" description="载重图暂无数据" v-else/> -->
-      <!-- </div> -->
-    </div>
+    </div> -->
     <!-- 定位 -->
     <!-- <div class="nowPosition" @click="getCurrentPosition">
       <van-icon name="aim" />
@@ -139,6 +114,7 @@ export default {
   name: "trackBack",
   data(){
     return {
+      local:"",
       title:'',
       map:null,
       center:null,
@@ -257,7 +233,7 @@ export default {
         if(typeof(AMapUI) !== 'undefined'){
           this.fetch()
         }else{
-          alert("无法加载地图，请打开网络")
+          alert("无法加载地图，请打开网络或重新加载")
         }
       })
     }else{
@@ -474,11 +450,12 @@ export default {
             // 设置当前点位
             that.currentPoint = that.actualList[idx]
             that.velocity = pointDataList[idx]
+            that.regeoCode(pointDataList[idx])
             that.trackInfo = {
-              location:pointDataList[idx].location,
-              velocity:pointDataList[idx].velocity,
-              sendTime:pointDataList[idx].sendTime,
-              weight:(pointDataList[idx].weightF8)/1000,
+              location:that.local,
+              velocity:pointDataList[idx].speed,
+              sendTime:pointDataList[idx].time,
+              weight:(pointDataList[idx].loadWeight)/1000,
               distance:that.navgtr.getMovedDistance()
             }
             if(that.myChart){
@@ -549,6 +526,22 @@ export default {
       // //在地图中添加marker
       this.map.add(_this.marker);
     },
+    //逆地址解析
+    regeoCode(val){
+      let _this = this
+      var geocoder = new AMap.Geocoder({
+        city: "010", //城市设为北京，默认：“全国”
+        radius: 1000 //范围，默认：500
+      });
+      geocoder.getAddress([val.longitude,val.latitude], (status, result) =>{
+        if (status === 'complete'&& result.regeocode) {
+          _this.local = result.regeocode.formattedAddress;
+        }else{
+          _this.local = "-"
+          console.log('根据经纬度查询地址失败')
+        } 
+      })
+    },
     IconType(index,w,h){
       let _this = this
       let imgUrl
@@ -597,6 +590,29 @@ export default {
       let sp = e.text
       this.times = e.text;
     },
+    //计算经纬度
+    calcPosition(data){
+      data.map(ele => {
+        ele.longitude = ele.longitude/1000000
+        ele.latitude = ele.latitude/1000000
+        ele.time = this.cutTime(ele.time)
+      })
+      return data
+    },
+    //时间拼接
+    cutTime(time){
+      let date = new Date()
+      let year = ""+date.getFullYear()
+      year = year.substr(0,2)
+      let times =''
+      let fullyear = year+time.substr(0,2)
+      let month = time.substr(2,2)
+      let day = time.substr(4,2)
+      let hour = time.substr(6,2)
+      let minu = time.substr(8,2)
+      let second = time.substr(10,2)
+      return fullyear + '-' + month + '-' + day + ' ' + hour + ':' + minu +':' + second
+    },
     fetch(){
       let _this = this
       this.plateNo = this.$route.query.plateNo
@@ -604,27 +620,31 @@ export default {
       let eTime = this.endTime || this.getNowDate("23:59:59")
       console.log(this.plateNo,sTime,eTime);
       trackQuery(this.plateNo,sTime,eTime).then(res => {
-        console.log(res);
+        let data = res.data
         //隐藏载重折线图
-        if(res.data.status === '0'){
-          let data = res.data.result.carHistory
-          this.result = this.unzip(data)
+        if(data.success){
+          if(data.data.length == 0){  
+            this.$notify({ type: 'primary', message: "暂无历史数据"});
+            this.initMap()
+            $(".loadMain").hide()
+            return false
+          }
+          this.result = this.calcPosition(data.data)
           console.log(this.result);
           if(this.result.length !== 0){
             //数据重置
             this.lineArr = []
             this.coordinateX = []
             this.chartsData = []
-            console.log(this.result[0].weightF8);
             this.result.forEach(val => {
               //轨迹数据
               this.lineArr.push([val.longitude,val.latitude])
               //载重图X轴
-              this.coordinateX.push(val.sendTime)
-              if(!val.weightF8 || val.weightF8 == "" || val.weightF8 == 'undefined'){
+              this.coordinateX.push(val.time)
+              if(!val.loadWeight || val.loadWeight == "" || val.loadWeight == 'undefined'){
                 this.chartsData.push(0)
               }else{
-                this.chartsData.push((val.weightF8/1000))
+                this.chartsData.push((val.loadWeight/1000))
               }
             })
             console.log(this.chartsData);
@@ -660,7 +680,7 @@ export default {
       this.initInfoWindow()
       this.initPlayBox()
       this.initPathSimplifier()
-      this.chartsInit()
+      // this.chartsInit()
     },
     // 初始化地图
     initMap() {
@@ -1054,7 +1074,8 @@ export default {
 }
 /deep/.amap-maptypecontrol{
   top:auto;
-  bottom:166px
+  bottom:166px;
+  right: 8px;
 }
 /deep/.van-overlay{
   z-index: 310;

@@ -17,20 +17,20 @@
     <van-field
       v-model="username"
       name="username"
-      :label="label"
+      left-icon="manager"
       :placeholder="placeholder"
       :rules="[{ required: true, message: '请填写用户名' }]"/>
     <van-field
       v-model="password"
       type="password"
       name="password"
-      label="密码"
-      placeholder="密码"
+      left-icon="lock"
+      placeholder="请输入密码"
       :rules="[{ required: true, message: '请填写密码'},{validator:passwordLength,message:'请设置6~10位密码'}]"/>
       <!-- <slider :successFun="handleSuccessFun" :errorFun="handleErrorFun"/> -->
-    <div style="margin: 16px;">
+    <div style="margin: 16px;margin-top:24px;">
       <van-button round block type="info" native-type="submit">
-        提交
+        登录
       </van-button>
     </div>
 </van-form>
@@ -39,6 +39,7 @@
 
 <script>
 import slider from './slider'
+import db from '@/common/localstorage'
 export default {
   name:'selelct',
   components: {
@@ -48,10 +49,15 @@ export default {
     return {
       radio: '1',
       label:'用户名',
-      username: '',
+      username: "",
       password: '',
-      placeholder:'用户名',
+      placeholder:'请输入用户名',
     }
+  },
+  created(){
+    let userInfo = db.get("USER_INFO")
+    this.username = userInfo.username
+    this.password = userInfo.password
   },
   methods: {
     radioChange(e){

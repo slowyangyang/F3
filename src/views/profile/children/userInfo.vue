@@ -1,8 +1,8 @@
 <template>
   <div class="userInfo">
     <van-card
-  :desc="infoList.nickname"
-  :thumb="infoList.headimgurl"/>
+      :desc="'你好~！'+infoList.username"
+      :thumb="infoList.headimgurl || defaultImg"/>
   </div>
 </template>
 
@@ -19,7 +19,7 @@ export default {
   },
   data(){
     return {
-
+      defaultImg:require("assets/image/defaultImg.jpg"),
     }
   }
 }
@@ -33,6 +33,9 @@ export default {
 .van-card__thumb{
   /* width: 60px;
   height: 60px; */
+}
+.van-card__desc{
+  font-size: 14px;
 }
 
 

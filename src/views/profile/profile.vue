@@ -2,9 +2,10 @@
   <div class="profile">
     <!-- 导航栏 -->
     <nav-bar :title="title"/>
+    <!-- 展示用户信息 -->
     <user-info :infoList="infoList"/>
-    <!-- 推送列表  -->
-    <my-push-list/>
+    <!-- 报警推送列表  -->
+    <!-- <my-push-list/> -->
     <!-- 退出登录 -->
     <van-button type="danger" round  @click="show = true">用户解绑</van-button>
     <van-action-sheet
@@ -46,28 +47,36 @@ export default {
     UserInfo,
     MyPushList
   },
+  mounted(){
+    this.infoList = db.get("USER_INFO")
+  },
   methods: {
     exit(e){
-      let openid = db.get("OPENID")
-      exitLogin(openid).then(res => {
-        console.log(res);
-        if(res.data.status === '0'){
-          db.remove("USER")
-          db.remove("token")
-          db.remove("OPENID")
-          this.$Toast({message:"解绑成功",duration:1500})
-          location.reload()
-        }else{
-          this.$Toast({message:res.data.msg,duration:1500})
-        }
-      }).catch(err => {
-          this.$Toast({message:res.data.msg,duration:1500})
-      })
+      let toast = this.$Toast.loading()
+      setTimeout(() => {
+        db.remove("expireTime")
+        db.remove("TOKEN")
+        this.$Toast({message:"解绑成功",duration:1500})
+        location.reload()
+        toast.clear()
+      },1500)
+      
+      // exitLogin(openid).then(res => {
+      //   console.log(res);
+      //   if(res.data.status === '0'){
+      //     db.remove("expireTime")
+      //     db.remove("TOKEN")
+      //     this.$Toast({message:"解绑成功",duration:1500})
+      //     location.reload()
+      //   }else{
+      //     this.$Toast({message:res.data.msg,duration:1500})
+      //   }
+      // }).catch(err => {
+      //     this.$Toast({message:res.data.msg,duration:1500})
+      // })
     },
   },
-  mounted(){
-    this.infoList = db.get("USER")
-  }
+  
 }
 </script>
 

@@ -15,8 +15,9 @@ module.exports = {
           "windows.jQuery":"jquery"
       })
     ],
-    devServer: {//本地跨域配置
-      proxy: {
+    devServer: {
+      port:8083,
+      proxy: {//本地跨域配置
         '/api':{
           target:'https://zs.thygps.com',
           changeOrigin: true,

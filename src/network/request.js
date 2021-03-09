@@ -2,6 +2,7 @@ import axios from 'axios'
 import store from '../store'
 import {Toast,Notify} from 'vant'
 import db from 'common/localstorage'
+import qs from 'qs'
 Toast.setDefaultOptions({
   forbidClick: true,
   duration:0
@@ -10,7 +11,7 @@ Toast.setDefaultOptions({
 let FEBS_REQUEST = axios.create({
   // baseURL: process.env.VUE_APP_BASEURL,
   // baseURL: `http://gzh.thygps.com`,
-  baseURL: `https://zs.thygps.com`,
+  baseURL: `https://zs.thygps.com/clbs`,
   responseType: 'json',
   withCredentials: true, // 允许携带cookie
   crossDomain: true,
@@ -24,8 +25,20 @@ let FEBS_REQUEST = axios.create({
 FEBS_REQUEST.interceptors.request.use((config) => {
   Toast.loading();
   // 有 token就带上
-  if (store.state.token) {
-    config.headers.Authentication = store.state.token
+  let token = store.state.TOKEN
+  if(token){
+    config.url = config.url+(config.method == 'post' ? "?access_token="+token : "access_token="+token)
+  }
+  let newTime = new Date()
+  let expireTime = store.state.expire_time
+  if(expireTime){
+    if (newTime.getTime() > new Date(expireTime).getTime()) {
+      Notify({ type: 'primary', message: '登录已过期，请重新登录'});
+      db.remove("expireTime")
+      setTimeout(()=>{
+        location.reload()
+      },1000)
+    }
   }
   return config
 }, (error) => {
@@ -34,7 +47,6 @@ FEBS_REQUEST.interceptors.request.use((config) => {
 
 // 拦截响应
 FEBS_REQUEST.interceptors.response.use((config) => {
-  console.log(config);
   let token = config.headers['authentication']
   let TOKEN_INVALID = config.data
   if(config.status == 200){
@@ -56,20 +68,31 @@ FEBS_REQUEST.interceptors.response.use((config) => {
   return config
 }, (error) => {
   if (error.response) {
+    console.log(error.response);
     let errorMessage = error.response.data === null ? '系统内部异常，请联系网站管理员' : error.response.data.message
-    Toast({message:errorMessage})
+    Toast({message:errorMessage,duration:1500})
   }
   Toast.clear()
   return Promise.reject(error)
 })
 
 const request = {
+  postForm(url, data) {
+    return FEBS_REQUEST({
+      method:"post",
+      url:url,
+      params:data,
+      headers: {
+        'Content-type': 'application/x-www-form-urlencoded',
+      }
+    })
+  },
   post (url, params) {
-    let contentType = url.indexOf('security_check') > -1 ? 'application/x-www-form-urlencoded' : 'application/json'
+    let contentType = url.indexOf('token') > -1 ? 'application/x-www-form-urlencoded' : 'application/json'
     return FEBS_REQUEST.post(url, params, {
       transformRequest: [(params) => {
         let result = ''
-        if (url.indexOf('security_check') > -1) {
+        if (url.indexOf('token') > -1) {
           Object.keys(params).forEach((key) => {
             if (!Object.is(params[key], undefined) && !Object.is(params[key], null)) {
               result += encodeURIComponent(key) + '=' + encodeURIComponent(params[key]) + '&'

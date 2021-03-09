@@ -1,4 +1,5 @@
 import request from '../request'
+import qs from 'qs'
 export function getSDK(url){
   return request.post("/app/login/getTicket",url)
 }
@@ -15,15 +16,27 @@ export function getCNodes(data){
 export function searchPalteNo(search=""){
   return request.get("/app/track/provideShowData?search="+search)
 }
-/** Search**/ 
+/** Search 车辆信息**/ 
 export function queryLocal(bvId){
-  return request.get("/app/vehicle/provideBVehicleInfo?bvId="+bvId.join(','))
+  return request.get("/swagger/m/monitoring/monitor/location/latest",bvId)
 }
 /** 轨迹 **/ 
 export function trackQuery(plateno,stime,etime){
-  return request.get("/app/track/getCarHistory",{
-    plateNo:plateno,
+  return request.get("/swagger/m/monitoring/monitor/location/history",{
+    name:plateno,
     startTime:stime,
     endTime:etime
   })
+}
+//获取车辆树
+export function getTrees(data){
+  return request.postForm("/swagger/m/bindfence/vehicelTree",data)
+}
+//首页获取分组组织树
+export function getOrgTree(data){
+  return request.postForm("/swagger/m/assignment/assignmentTree",data)
+}
+//查询组织下的车辆
+export function getVehicle(data){
+  return request.postForm(`/m/functionconfig/fence/bindfence/new/putMonitorByAssign`,data)
 }

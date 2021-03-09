@@ -4,11 +4,12 @@
       <van-search
         v-model="value"
         shape="round"
-        placeholder="请输入车牌号"
+        placeholder="请输入车牌号3个字符以上"
         @search="onSearch"
         @cancel="onCancel"
         @focus="onFocus"
         @blur="onBlur"
+        @clear="onClear"
         ref="search"/>
     </form>
     <!-- 搜索记录 -->
@@ -32,13 +33,17 @@ import '@/assets/css/zTreeStyle.css'
 import "@/assets/js/jquery.ztree.core.min.js"
 import "@/assets/js/jquery.ztree.excheck.min.js"
 import "@/assets/js/jquery.ztree.exhide.min.js"
-import { getPNodes, queryLocal, searchPalteNo } from 'network/home'
+import { getPNodes, queryLocal, searchPalteNo, getTrees, getOrgTree, getVehicle } from 'network/home'
+import toTreeByRecursion from './tree'
 import pako from 'pako'
 import axios from 'axios'
+import qs from 'qs'
+
 export default {
   name:'search',
   data(){
     return {
+      vehicles:[],
       value:'',
       cordShow:false,
       isfetch:true,
@@ -155,47 +160,66 @@ export default {
       ],
       bvId:[],
       timer:null,
-      autoParam:[]
+      autoParam:[],
+      yiu:""
     }
   },
   mounted(){
     // this.initzTree()
+    this.getTred()
+    
   },
   activated(){
-    console.log(this.bvId);
-    if(this.bvId.length){
+    //判断this.bvId,是否继续进行轮询
+    let arrBV = Object.keys(this.bvId)
+    if(arrBV.length){
       this.polling()
     }
   },
   deactivated(){
+    console.log(255);
     clearInterval(this.timer)
     this.timer = null
   },
   methods: {
+    //获取车辆树
+    getTred(){
+      getTrees({type:'single'}).then(res => {
+        this.vehicles = res.data.obj
+      })
+    },
     onSearch(e){
       this.$emit('Search',e)
     },
     onCancel(e){
+      console.log(22);
       this.$emit('Cancel',e)
     },
+    //搜索框得到焦点时
     onFocus(){
       if(this.isfetch){
         this.isfetch = false
         this.cordShow = true
+        //
         this.fetch()
-        // this.initzTree()
       }
+    },
+    onClear(e){
+      this.$emit("clear",e)
     },
     onBlur(){
       return false
     },
+    //关闭按钮
     btnCancel(){
       this.cordShow = false
       this.isfetch = true
+      this.value = ""
     },
+    //确定按钮
     btnConfirm(){
       let str = ''
-      this.bvId = []
+      this.bvId = {}
       //获取选中的项
       let checked = this.treeObj.getChangeCheckedNodes(true)
       //筛选叶子节点
@@ -203,11 +227,12 @@ export default {
       if(checked.length){
         checked.forEach(val => {
           str+=val.name+','
-          this.bvId.push(val.id)
+          // this.bvId.push(val.name)
         })
         str = str.substr(0,str.length-1)
+        this.bvId = {name:str}
         this.value = str
-        this.queryCar(this.bvId)
+        this.queryCar({name:str})
       }
       this.cordShow = false
       this.isfetch = true
@@ -216,107 +241,43 @@ export default {
       queryLocal(bvId).then(res => {
         console.log(res);
         let data = res.data
-        if(data.status === '0'){
-          this.$Bus.$emit('getlocal',data.result.vehicle)
+        if(data.data.length){
+          let isEmpty = data.data.filter(ele => (ele.longitude=="" || ele.latitude==""))
+          if(isEmpty.length){
+            this.$notify({ type: 'primary', message: "未查询到该车位置"});
+            return false
+          }
+          let positionData = this.calcPosition(data.data)
+          console.log(positionData);
+          this.$Bus.$emit('getlocal',positionData)
           this.polling()
         }else{
-          this.$notify({ type: 'primary', message: data.msg});
+          this.$notify({ type: 'primary', message: "未查询到位置信息"});
         }
       })
     },
-    Collapse(event, treeId, treeNode){
-      //被折叠
-      console.log(treeNode);
-    },
-    //展开时请求子节点
-    Expand(event, treeId, treeNode){
-      console.log(treeNode);
-      if(!treeNode.isParent){
-        return
-      }
-      // this.getZNodes(treeNode)
-    },
-    getZNodes(treeNode){
-      getZNodes(treeNode.id).then(res => {
-        let data = res.data
-        let result = this.unzip(res.data.result)
-        console.log(result);
-        let nodes = []
-        if(data.status == 0){
-          let org = result.data.org
-          let bv = result.data.bv
-          if(org){
-            org.forEach(val => {
-              let obj = {}
-              obj.id = val.id
-              obj.name = val.orgName
-              obj.pid = val.parentId
-              obj.isParent = true
-              obj.nocheck = true
-              nodes.push(obj)
-            })
-            this.treeObj.addNodes(treeNode,-1,nodes,true)
-          }
-          if(bv){
-            nodes = []
-            bv.forEach(val=>{
-              let obj = {}
-              obj.id = val.ve.id
-              obj.name = val.ve.plateNo
-              obj.simNo = val.ve.simNo
-              obj.orgId = val.ve.orgId
-              nodes.push(obj)
-            })
-            console.log(nodes);
-            this.treeObj.addNodes(treeNode,-1,nodes,true)
-          }
-          this.treeObj.updateNode(treeNode,false)
-          console.log(this.zNodes);
-        }else{
-          this.$notify("暂无此数据")
-        }
+    //计算经纬度
+    calcPosition(data){
+      data.map(ele => {
+        ele.longitude = ele.longitude/1000000
+        ele.latitude = ele.latitude/1000000
+        ele.time = this.cutTime(ele.time)
       })
+      return data
     },
-    initzTree(){
-      $.fn.zTree.init($("#"+this.treeId), this.setting, this.zNodes).expandAll(false);
-      this.treeObj = $.fn.zTree.getZTreeObj("ztree")
-      var nodes = this.treeObj.getNodes()
-      this.allNodes = this.queryFun(nodes)
-      this.nodes = []
-    },
-    zTreeOnClick(event, treeId, treeNode){
-      let checked = this.treeObj.getCheckedNodes(true)
-      console.log(treeNode);
-      if(treeNode.isParent){
-        if(treeNode.open){
-          this.treeObj.expandNode(treeNode,false)
-        }else{
-          this.getZNodes(treeNode)
-          this.treeObj.expandNode(treeNode,true)
-        }
-        return
-      }
-      if(checked.length > 2){
-        if(!treeNode.checked){
-          this.$Toast({message:'请最多选择三个',duration:1500})
-          this.treeObj.cancelSelectedNode(treeNode)
-        }else{
-          this.treeObj.checkNode(treeNode,'',false)
-        }
-      }else{
-        this.treeObj.checkNode(treeNode,'',true)
-      }
-    },
-    onchecked(event, treeId, treeNode){
-      let checked = this.treeObj.getCheckedNodes()
-      console.log(checked);
-      if(checked.length > 3){
-        if(treeNode.checked){
-          this.$Toast({message:'请最多选择三个',duration:1500})
-          this.treeObj.checkNode(treeNode,'',true)
-          // this.treeObj.cancelSelectedNode(treeNode)
-        }
-      }
+    //时间拼接
+    cutTime(time){
+      let date = new Date()
+      let year = ""+date.getFullYear()
+      year = year.substr(0,2)
+      let times =''
+      let fullyear = year+time.substr(0,2)
+      let month = time.substr(2,2)
+      let day = time.substr(4,2)
+      let hour = time.substr(6,2)
+      let minu = time.substr(8,2)
+      let second = time.substr(10,2)
+      return fullyear + '-' + month + '-' + day + ' ' + hour + ':' + minu +':' + second
     },
     queryFun(node) {
       for (var i in node) {
@@ -373,7 +334,6 @@ export default {
               })
               this.treeObj.updateNode(nodes[i])
             }
-            console.log(nodes[i]);
             this.treeObj.showNode(nodes[i])
             this.nodesShow.push(nodes[i])
           }else {
@@ -388,9 +348,9 @@ export default {
           var pathOfOne = node.getPath()
           if (pathOfOne && pathOfOne.length > 0) {
             for (var i = 0; i < pathOfOne.length - 1; i++) {
-              console.log(pathOfOne[i]);
+              // console.log(pathOfOne[i]);
                 this.treeObj.showNode(pathOfOne[i])
-              this.treeObj.expandNode(pathOfOne[i], true)
+                this.treeObj.expandNode(pathOfOne[i], true)
             }
           }
         })
@@ -401,129 +361,111 @@ export default {
         })
       }
     },
-    fetch(){
-      getPNodes().then(res => {
-        let data = res.data
-        let result = this.unzip(data)
-        console.log(result);
-        if(result){
-          this.zNodes = []
-          //遍历组织
-          let parentNode = {}
-          for(let i=0;i<result.length;i++){
-            if(result[i].name == '泰恒元科技'){
-              parentNode.id = result[i].id
-              parentNode.name = result[i].name
-              parentNode.pid = result[i].pId
-              parentNode.isParent = true,
-              parentNode.nocheck = true
-              parentNode.children = []
-              this.zNodes.push(parentNode)
-              break
-            }
+    //被折叠
+    Collapse(event, treeId, treeNode){
+      console.log(treeNode);
+    },
+    //展开时请求子节点
+    Expand(event, treeId, treeNode){
+      if(treeNode.children){
+        console.log(1);
+        return false
+      }
+      this.getZNodes(treeNode)
+    },
+    getZNodes(treeNode){
+       this.vehicles.forEach(ele => {
+        if(ele.pId == treeNode.id){
+          this.treeObj.addNodes(treeNode,-1,ele,true)
+        }
+      })
+    },
+    initzTree(){
+      $.fn.zTree.init($("#"+this.treeId), this.setting, this.zNodes).expandAll(false)
+      this.treeObj = $.fn.zTree.getZTreeObj("ztree")
+      var nodes = this.treeObj.getNodes()
+      console.log(nodes);
+      this.allNodes = this.queryFun(nodes)
+      this.nodes = []
+    },
+    //点击节点时
+    zTreeOnClick(event, treeId, treeNode){
+      let checked = this.treeObj.getCheckedNodes(true)
+      console.log(treeNode);
+      if(treeNode.isParent){
+        if(treeNode.open){
+          this.treeObj.expandNode(treeNode,false)
+        }else{
+          if(treeNode.children){
+            this.treeObj.expandNode(treeNode,true)
+            return false
           }
-          this.eachOrg(result)
-          // for(let i = 0; i < result.length; i++){
-          //   let obj = {}
-          //   if(result[i].name !== '泰恒元科技' && result[i].type == "group"){
-          //     obj.id = result[i].id
-          //     obj.name = result[i].name
-          //     obj.pid = result[i].pId
-          //     obj.uuid = result[i].uuid
-          //     obj.isParent = true,
-          //     obj.nocheck = true
-          //     obj.children = []
-          //     for(let j = 0; j < result.length; j++){
-          //       let objc = {}
-          //       if(result[i].id == result[j].pId){
-                  
-          //         objc.id = result[j].id
-          //         objc.name = result[j].name
-          //         objc.pid = result[j].pId
-          //         objc.uuid = result[j].uuid
-          //         objc.isParent = true
-          //         objc.nocheck = true
-          //         objc.children = []
-          //         obj.children.push(objc)
-          //       }
-          //     }
-          //     if(result[i].uuid){
-          //       this.zNodes[0].children.push(obj)
-          //     }
-          //   }
-          // }
-          this.initzTree()
+          this.treeObj.expandNode(treeNode,true)
+          this.getZNodes(treeNode)
+        }
+        return
+      }
+      if(checked.length > 2){
+        if(!treeNode.checked){
+          this.$Toast({message:'请最多选择三个',duration:1500})
+          this.treeObj.cancelSelectedNode(treeNode)
+        }else{
+          this.treeObj.checkNode(treeNode,'',false)
+        }
+      }else{
+        this.treeObj.checkNode(treeNode,'',true)
+      }
+    },
+    onchecked(event, treeId, treeNode){
+      let checked = this.treeObj.getCheckedNodes()
+      console.log(checked);
+      if(checked.length > 3){
+        if(treeNode.checked){
+          this.$Toast({message:'请最多选择三个',duration:1500})
+          this.treeObj.checkNode(treeNode,'',true)
+          // this.treeObj.cancelSelectedNode(treeNode)
+        }
+      }
+    },
+    //无限级菜单遍历
+    getTreeData(list){
+        var treeData=[];
+        var map={};
+        list.forEach(function (item) {
+          item.nocheck = true
+          item['name']=item.name;
+          item["isParent"] = true
+          map[item.id]=item;
+        })
+        list.forEach(function (item) {
+          var parent = map[item.pId];
+          if (parent) {
+              (parent.children || ( parent.children = [] )).push(item);
+          } else {
+              treeData.push(item);
+          }
+        })
+        return treeData;
+    },
+    //获取组织树
+    fetch(){
+      getOrgTree({isOrg:1}).then(res => {
+        console.log(res);
+        let data = res.data
+        if(data.success){
+          if(data.obj){
+            this.zNodes = []
+            let treenode = []
+            this.zNodes = this.getTreeData(data.obj)
+            //初始化树组织
+            this.initzTree()
+          }
         }else{
           this.$notify({type:'primary',message:data.message})
         }
       })
     },
-    eachOrg(org){
-      let group = []
-      let group1 = []
-      for(let i = 0; i < org.length; i++){
-        if(org[i].name !== '泰恒元科技' && org[i].type == "group"){
-          group.push(org[i])
-        }
-      }
-      for(let i = 0; i < org.length; i++){
-        if(org[i].name !== '泰恒元科技' && org[i].type == "assignment"){
-          group1.push(org[i])
-        }
-      }
-      console.log(group);
-      console.log(group1);
-      this.getTree(group,group1)
-    },
-    getTree(group,group1){
-      for(let i = 0; i < group.length; i++){
-        if(group[i].name == '网约车'){
-          console.log(group[i]);
-        }
-        let obj1 = {}
-        obj1.id = group[i].id
-              obj1.name = group[i].name
-              obj1.pid = group[i].pId
-              obj1.uuid = group[i].uuid
-              obj1.type = group[i].type
-              obj1.isParent = true
-              obj1.nocheck = true
-              obj1.children = []
-        for(let j = 1; j < group.length; j++){
-          
-          if(group[i].id == group[j].pId){
-              
-              let obj2 = {}
-              obj2.id = group[j].id
-              obj2.name = group[j].name
-              obj2.pid = group[j].pId
-              obj2.uuid = group[j].uuid
-              obj2.type = group[j].type
-              obj2.isParent = true
-              obj2.nocheck = true
-              obj2.children = []
-              obj1.children.push(obj2)
-          }
-        }
-        // for(let k = 0; k < group1.length; k++){
-        //   let obj3 = {}
-        //   if(group[i].id == group1[k].pId){
-        //     obj3.id = group1[k].id
-        //     obj3.name = group1[k].name
-        //     obj3.pid = group1[k].pId
-        //     obj3.uuid = group1[k].uuid
-        //     obj3.type = group1[k].type
-        //     obj3.isParent = true
-        //     obj3.nocheck = true
-        //     obj3.children = []
-        //     obj1.children.push(obj3)
-        //   }
-        // }
-        if(obj1.children.length !== 0){
-          this.zNodes[0].children.push(obj1)
-        }
-      }
-    },
+    //对车辆位置做轮询查找
     polling(){
       if(this.timer){
         clearInterval(this.timer)
@@ -532,10 +474,12 @@ export default {
         queryLocal(this.bvId).then(res => {
           console.log(res);
           let data = res.data
-          if(data.status == 0){
-            this.$Bus.$emit('getlocal',data.result.vehicle)
+          if(data.data.length){
+            let positionData = this.calcPosition(data.data)
+            this.$Bus.$emit('getlocal',positionData)
           }else{
-            this.$notify({ type: 'primary', message: data.msg});
+            clearInterval(this.timer)
+            this.$notify({ type: 'primary', message: "未查询到位置信息"});
           }
         })
       },30000)
@@ -590,33 +534,47 @@ export default {
   },
   watch: {
     value(newV) {
-      //本地搜索
-      // this.searchFun(newV, false, false)
+      this.zNodes = []
+      if(!newV){
+        this.fetch()
+      }
+      let reg = new RegExp(newV)
       if(newV.length>=3 && newV){
-        searchPalteNo(newV).then(res=>{
-          console.log(res);
-          let data = res.data
-          let result = this.unzip(res.data.result)
-          if(data.status === '0'){
-            let bv = result.data.bv
-            // let bv = res.data.result.data.bv
-            if(bv){
-              this.zNodes = []
-              bv.forEach(val=>{
-                let obj = {}
-                obj.id = val.ve.id
-                obj.name = val.ve.plateNo
-                obj.simNo = val.ve.simNo
-                obj.orgId = val.ve.orgId
-                this.zNodes.push(obj)
-              })
-              this.initzTree()
-            }
-          }else{
-            this.$notify("无此车辆信息")
+        this.vehicles.forEach(ele => {
+          if(reg.test(ele.name)){
+            this.zNodes.push(ele)
           }
         })
+        this.initzTree()
       }
+      //本地搜索
+      // this.searchFun(newV, false, false)
+      //请求搜索
+      // if(newV.length>=3 && newV){
+      //   searchPalteNo(newV).then(res=>{
+      //     console.log(res);
+      //     let data = res.data
+      //     let result = this.unzip(res.data.result)
+      //     if(data.status === '0'){
+      //       let bv = result.data.bv
+      //       // let bv = res.data.result.data.bv
+      //       if(bv){
+      //         this.zNodes = []
+      //         bv.forEach(val=>{
+      //           let obj = {}
+      //           obj.id = val.ve.id
+      //           obj.name = val.ve.plateNo
+      //           obj.simNo = val.ve.simNo
+      //           obj.orgId = val.ve.orgId
+      //           this.zNodes.push(obj)
+      //         })
+      //         this.initzTree()
+      //       }
+      //     }else{
+      //       this.$notify("无此车辆信息")
+      //     }
+      //   })
+      // }
     },
     cordShow(newVal){
       if(newVal){
